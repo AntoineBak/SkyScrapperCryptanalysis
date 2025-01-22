@@ -24,7 +24,7 @@ def chi8(x):
 
 def L(x):
     """
-    Compute the lookups in the SkyScrapper hash function.
+    Compute the lookups in the SkyScraper hash function.
     """
     return circular_shift(chi8(x), 1, 8)
 
@@ -48,9 +48,9 @@ def Bar(x):
         y += 2**(8*i)*y_list[i]
     return y
 
-def SkyScrapper(xL, xR, rcons):
+def SkyScraper(xL, xR, rcons):
     """
-    The full SkyScrapper permutation.
+    The full SkyScraper permutation.
     """
     yL, yR = xL, xR
     
@@ -130,7 +130,7 @@ def get_input_pair(delta_in, delta_out, rcons):
 
 
 
-def attack(rcons, good_delta):
+def trunc_diff(rcons, good_delta):
     """
     Find input-output pairs mathing some truncated differential characteristic.
     """
@@ -139,13 +139,8 @@ def attack(rcons, good_delta):
             for i in range(15):
                 for j in range(15):
                     [[x_L1, x_R1], [x_L2, x_R2]] = get_input_pair(delta_in*2**(8*i), delta_out*2**(8*j), rcons)
-                    y_L1, y_R1 = SkyScrapper(x_L1, x_R1, rcons)
-                    y_L2, y_R2 = SkyScrapper(x_L2, x_R2, rcons)
-
-                    #print(hex(x_L2 - x_L1))
-                    #print(hex(-(y_R2 - y_R1)))
-                    #print(hex(x_R2 - x_R1))
-                    #print(hex(-(y_L2 - y_L1)))
+                    y_L1, y_R1 = SkyScraper(x_L1, x_R1, rcons)
+                    y_L2, y_R2 = SkyScraper(x_L2, x_R2, rcons)
 
                     if (x_L2 - x_L1 == delta_in*2**(8*i)) and (y_R2 - y_R1 == -1*delta_out*2**(8*j)):
                         print("Input 1 is:")
@@ -159,14 +154,54 @@ def attack(rcons, good_delta):
                         print("Differential: ({}, ?) -> (?, {})".format(hex(x_L2 - x_L1), hex(y_R2 - y_R1)))
 
 
+def collision_9(rcons, good_delta):
+    """
+    Find input-output pairs mathing some truncated differential characteristic.
+    """
+    for delta in good_delta:
+        for i in range(15):
+            [[x_L1, x_R1], [x_L2, x_R2]] = get_input_pair(delta*2**(8*i), delta*2**(8*i), rcons)
+            y_L1, y_R1 = SkyScraper(x_L1, x_R1, rcons)
+            y_L2, y_R2 = SkyScraper(x_L2, x_R2, rcons)
 
-good_delta = [1, 2, 4, 8, 16, -1, -2, -4, -8, -16]
-good_delta = [Fp(delta) for delta in good_delta]
+            if (x_L2 - x_L1 + y_R2 - y_R1 == 0):
+                # return 1 if a collision was found for this choice of constants
+                return 1
+    return 0
 
-rcons = [0, 17829420340877239108687448009732280677191990375576158938221412342251481978692, 
+
+def test_trunc_diff():
+    # Use round constans from the reference implementation
+    rcons = [0, 17829420340877239108687448009732280677191990375576158938221412342251481978692, 
          27740342931201890067831390843279536630457710544396725670188095857896839417202, 17048088173265532689680903955395019356591870902241717143279822196003888806966, 
          4641041932484616674503150018277105937647322787229235415313079154504538247098, 23518768991468467328187394347260979305359711922005254253047385842741274989784, 
          42924498470449697215909973597747708755064028547754583139137172884417685452938, 4670171540012394890944659920922397025152994631853985835833059662854559397332, 
          16971509144034029782226530622087626979814683266929655790026304723118124142299, 0]
 
-attack(rcons, good_delta)
+    print("Finding truncated differentials for one instance:")
+    trunc_diff(rcons, good_delta)
+
+def test_collision_9(n_iterations):
+    score = 0
+
+    print("Looking for collisions on the 9-round compression:")
+
+    for k in range(n_iterations):
+        rcons = [Fp.random_element() for i in range(10)]
+        score += collision_9(rcons, good_delta)
+
+    proba = float(score / n_iterations)
+
+    print("A collision was found with probability {} over the choice of constants.".format(proba))
+    print("Over {} instances of SkyScraper.".format(n_iterations))
+
+
+if __name__ == "__main__":
+    good_delta = [1, 2, 4, 8, 16, -1, -2, -4, -8, -16]
+    good_delta = [Fp(delta) for delta in good_delta]
+
+    n_iterations = 1000
+
+    test_trunc_diff()
+    test_collision_9(n_iterations)
+
